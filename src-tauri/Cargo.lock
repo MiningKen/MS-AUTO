@@ -1920,6 +1920,7 @@ version = "0.1.0"
 dependencies = [
  "enigo",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-global-shortcut",

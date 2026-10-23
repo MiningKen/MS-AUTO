@@ -26,13 +26,31 @@ struct Shortcut {
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "mode", rename_all = "lowercase")]
-enum InputTarget {
-    Focused,
-    Window(TargetWindow),
+#[serde(rename_all = "camelCase")]
+struct InputTarget {
+    #[serde(default)]
+    mode: Option<String>,
+    id: Option<String>,
+    title: Option<String>,
+    process_id: Option<u32>,
+    platform: Option<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+impl InputTarget {
+    fn window(self) -> Result<Option<TargetWindow>, String> {
+        if self.mode.as_deref() != Some("window") {
+            return Ok(None);
+        }
+        Ok(Some(TargetWindow {
+            id: self.id.ok_or("指定目標缺少視窗 id")?,
+            title: self.title.ok_or("指定目標缺少視窗名稱")?,
+            process_id: self.process_id.ok_or("指定目標缺少程序 id")?,
+            platform: self.platform.ok_or("指定目標缺少平台")?,
+        }))
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TargetWindow {
     id: String,
@@ -44,10 +62,14 @@ struct TargetWindow {
 #[tauri::command]
 fn send_shortcut(
     shortcut: Shortcut,
-    target: Option<InputTarget>,
+    input_target: Option<InputTarget>,
     state: State<'_, InputState>,
 ) -> Result<(), String> {
-    if let Some(InputTarget::Window(target)) = target {
+    let target = match input_target {
+        Some(target) => target.window()?,
+        None => None,
+    };
+    if let Some(target) = target {
         return send_shortcut_to_target(&shortcut, &target);
     }
     let mut input = state.0.lock().map_err(|_| "鍵盤服務暫時無法使用")?;
@@ -183,6 +205,23 @@ fn parse_key(key: &str) -> Result<Key, String> {
     match (chars.next(), chars.next()) {
         (Some(character), None) => Ok(Key::Unicode(character)),
         _ => Err(format!("不支援的按鍵：{key}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InputTarget;
+
+    #[test]
+    fn treats_a_legacy_target_without_mode_as_the_focused_target() {
+        let target: InputTarget = serde_json::from_str("{}").expect("legacy target should parse");
+        assert!(target.window().expect("legacy target is valid").is_none());
+    }
+
+    #[test]
+    fn requires_complete_details_for_a_window_target() {
+        let target: InputTarget = serde_json::from_str(r#"{"mode":"window"}"#).expect("window target should parse");
+        assert_eq!(target.window().unwrap_err(), "指定目標缺少視窗 id");
     }
 }
 
