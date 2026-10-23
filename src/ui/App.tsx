@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
+import { createDoublePressHandler } from '../core/double-press';
 import { ProfileService, type ImportResolution, type Profile } from '../core/profile-service';
 import { parseProfile, parseProfiles } from '../core/profile-codec';
 import { TaskScheduler, type KeyShortcut, type ScheduledTask } from '../core/task-scheduler';
@@ -11,6 +13,7 @@ import {
   openAccessibilitySettings,
   setTrayStatus
 } from '../platform/app-lifecycle';
+import { IntervalInput } from './IntervalInput';
 
 const noTasks: ScheduledTask[] = [];
 
@@ -59,6 +62,7 @@ export default function App() {
     void notify('KeyPulse 無法送出按鍵', '請確認目前視窗與 macOS 的輔助使用權限。');
   }));
   const actions = useRef<{ toggle: () => void; stop: () => void }>({ toggle: () => {}, stop: () => {} });
+  const localEscapeStop = useRef(createDoublePressHandler(() => actions.current.stop()));
 
   useEffect(() => { localStorage.setItem('key-pulse.profiles', JSON.stringify(profiles)); }, [profiles]);
 
@@ -88,7 +92,7 @@ export default function App() {
       scheduler.current.start(tasks);
       setRunning(true);
       void setTrayStatus(true);
-      setMessage('正在對目前取得焦點的視窗送出按鍵。Esc 可緊急停止。');
+      setMessage('正在對目前取得焦點的視窗送出按鍵。快速連按兩次 Esc 可緊急停止。');
       void notify('KeyPulse 執行中', '正在將按鍵送到目前取得焦點的視窗。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '設定無法啟動。');
@@ -118,9 +122,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (isTauri()) return;
     const listener = (event: KeyboardEvent) => {
       if (event.key === 'F12') { event.preventDefault(); actions.current.toggle(); }
-      if (event.key === 'Escape') actions.current.stop();
+      if (event.key === 'Escape') localEscapeStop.current();
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
@@ -264,7 +269,7 @@ export default function App() {
               <button className={recordingId === task.id ? 'key-button recording' : 'key-button'} onClick={() => setRecordingId(task.id)} onKeyDown={(event) => captureShortcut(event, task.id)}>{recordingId === task.id ? '現在按下按鍵…' : formatShortcut(task.shortcut)}</button>
               <small>點選後直接按鍵盤按鍵；這不是錄影。</small>
             </label>
-            <label>間隔（秒）<input min="0.1" step="0.1" type="number" value={task.intervalMs / 1_000} onChange={(event) => updateTask(task.id, { intervalMs: Math.round(Number(event.target.value) * 1_000) })} /></label>
+            <label>間隔（秒）<IntervalInput intervalMs={task.intervalMs} onChange={(intervalMs) => updateTask(task.id, { intervalMs })} /></label>
             <label className="toggle-label"><input checked={task.enabled} type="checkbox" onChange={(event) => updateTask(task.id, { enabled: event.target.checked })} />啟用</label>
             <button className="remove-button" aria-label={`刪除 ${task.name}`} onClick={() => setTasks((current) => current.filter((item) => item.id !== task.id))}>刪除</button>
           </article>)}
@@ -273,7 +278,7 @@ export default function App() {
 
       <aside className="help-card"><h2>使用提醒</h2><ul>
         <li>按鍵會送到目前取得焦點的視窗；請在開始前確認焦點位置。</li>
-        <li>按 <kbd>F12</kbd> 啟動或停止，按 <kbd>Esc</kbd> 可立即停止。</li>
+        <li>按 <kbd>F12</kbd> 啟動或停止；0.5 秒內連按兩次 <kbd>Esc</kbd> 可緊急停止。</li>
         <li>Mac 若 F12 是媒體鍵，請使用 <kbd>Fn</kbd> + <kbd>F12</kbd>。</li>
         <li>首次於 Mac 使用時，請依系統提示授予「輔助使用」權限。</li>
       </ul></aside>
