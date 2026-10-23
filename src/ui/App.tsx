@@ -54,6 +54,7 @@ export default function App() {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<Profile | null>(null);
   const [accessibilityGranted, setAccessibilityGranted] = useState<boolean | null>(null);
+  const [toggleShortcut, setToggleShortcut] = useState('F12');
   const [capturingTargetId, setCapturingTargetId] = useState<string | null>(null);
   const [message, setMessage] = useState('尚未執行。F12 可隨時啟動或停止。');
   const activeProfile = profiles.find((profile) => profile.id === activeProfileId) ?? profiles[0];
@@ -112,11 +113,16 @@ export default function App() {
     void registerControlShortcuts(
       () => actions.current.toggle(),
       () => actions.current.stop(),
-      () => {
-        setMessage('無法註冊 F12／Esc 全域熱鍵。請從系統匣開啟程式，或更換衝突的系統熱鍵。');
-        void notify('KeyPulse 全域熱鍵不可用', 'F12 與 Esc 未能註冊；請從系統匣控制程式。');
+      (registration) => {
+        const toggleHint = registration.toggleShortcut ?? 'F12 與 Ctrl + Shift + F12';
+        const stopHint = registration.stopAvailable ? '' : '；雙擊 Esc 也無法使用';
+        setMessage(`無法註冊 ${toggleHint} 全域熱鍵${stopHint}。請關閉佔用熱鍵的程式後重開 KeyPulse。`);
+        void notify('KeyPulse 部分熱鍵不可用', `無法註冊 ${toggleHint}${stopHint}。`);
       }
-    ).then((cleanup) => { unregister = cleanup; });
+    ).then((registration) => {
+      unregister = registration.unregister;
+      if (registration.toggleShortcut) setToggleShortcut(registration.toggleShortcut);
+    });
     return () => { void unregister?.(); };
   }, []);
 
@@ -261,7 +267,7 @@ export default function App() {
           <h1>鍵盤連點</h1>
           <p className="subtle">每個任務都有自己的按鍵與間隔，所有內容只保存於這台電腦。</p>
         </div>
-        <button className={running ? 'stop-button' : 'start-button'} onClick={toggle}>{running ? '停止全部（F12）' : '啟動全部（F12）'}</button>
+        <button className={running ? 'stop-button' : 'start-button'} onClick={toggle}>{running ? `停止全部（${toggleShortcut}）` : `啟動全部（${toggleShortcut}）`}</button>
       </header>
 
       <section className="status" aria-live="polite"><strong>{running ? '執行中' : '已停止'}</strong><span>{message}</span></section>
@@ -331,7 +337,7 @@ export default function App() {
 
       <aside className="help-card"><h2>使用提醒</h2><ul>
         <li>此設定檔的所有任務共用一個送鍵目標；選取指定視窗後，可在其他螢幕工作。部分程式可能拒絕背景按鍵。</li>
-        <li>按 <kbd>F12</kbd> 啟動或停止；0.5 秒內連按兩次 <kbd>Esc</kbd> 可緊急停止。</li>
+        <li>按 <kbd>{toggleShortcut}</kbd> 啟動或停止；0.5 秒內連按兩次 <kbd>Esc</kbd> 可緊急停止。</li>
         <li>Mac 若 F12 是媒體鍵，請使用 <kbd>Fn</kbd> + <kbd>F12</kbd>。</li>
         <li>首次於 Mac 使用時，請依系統提示授予「輔助使用」權限。</li>
       </ul></aside>
