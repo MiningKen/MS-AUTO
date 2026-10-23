@@ -21,7 +21,7 @@ describe('TaskScheduler', () => {
     vi.advanceTimersByTime(1_000);
 
     expect(sender.send).toHaveBeenCalledTimes(2);
-    expect(sender.send).toHaveBeenNthCalledWith(1, task.shortcut);
+    expect(sender.send).toHaveBeenNthCalledWith(1, task);
     expect(scheduler.isRunning()).toBe(false);
   });
 

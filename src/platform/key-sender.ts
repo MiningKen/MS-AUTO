@@ -1,13 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { KeySender, KeyShortcut } from '../core/task-scheduler';
+import type { KeySender, ScheduledTask } from '../core/task-scheduler';
 
 export class DesktopKeySender implements KeySender {
-  async send(shortcut: KeyShortcut): Promise<void> {
+  async send(task: ScheduledTask): Promise<void> {
     try {
-      await invoke('send_shortcut', { shortcut });
+      await invoke('send_shortcut', { shortcut: task.shortcut, target: task.target ?? { mode: 'focused' } });
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.info('模擬送鍵：', shortcut, error);
+        console.info('模擬送鍵：', task.shortcut, error);
         return;
       }
       throw error;

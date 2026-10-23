@@ -1,7 +1,7 @@
 :root { color: #e8edf7; background: #111827; font-family: Inter, "Noto Sans TC", system-ui, sans-serif; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { cursor: pointer; }
 .app-shell { max-width: 980px; margin: 0 auto; padding: 48px 24px 64px; }
 header, .panel-heading, .status, .task-card { display: flex; align-items: center; gap: 20px; }
@@ -32,13 +32,16 @@ h2 { font-size: 1.1rem; }
 .drag-handle { align-self: center; color: #94a3b8; cursor: grab; font-size: 1.4rem; }
 label { display: grid; gap: 7px; color: #cbd5e1; font-size: .85rem; font-weight: 700; }
 label:first-child { flex: 1 1 200px; }
-input { min-width: 100px; border: 1px solid #475569; border-radius: 8px; padding: 9px 10px; background: #172033; color: #f8fafc; }
+input, select { min-width: 100px; border: 1px solid #475569; border-radius: 8px; padding: 9px 10px; background: #172033; color: #f8fafc; }
 .key-button { min-width: 145px; background: #1e3a5f; color: #dbeafe; border: 1px solid #3b82f6; }
 .recording { background: #713f12; border-color: #facc15; color: #fef3c7; }
 .toggle-label { display: flex; align-items: center; padding-bottom: 10px; }
 .toggle-label input { min-width: auto; width: 18px; height: 18px; }
 .remove-button { background: transparent; color: #fda4af; padding-bottom: 10px; }
+.target-controls { display: flex; align-items: center; gap: 6px; max-width: 260px; }
+.target-controls span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.target-controls .secondary-button, label > .secondary-button { padding: 7px 9px; font-size: .78rem; }
 .help-card { margin-top: 18px; }
 .help-card ul { color: #cbd5e1; line-height: 1.7; padding-left: 20px; }
 kbd { border: 1px solid #64748b; border-radius: 5px; padding: 1px 5px; background: #0f172a; color: #f8fafc; }
-@media (max-width: 720px) { .app-shell { padding: 28px 16px; } header, .panel-heading, .task-card, .profile-bar { align-items: stretch; flex-direction: column; } .task-card label, .key-button, .task-card input { width: 100%; } }
+@media (max-width: 720px) { .app-shell { padding: 28px 16px; } header, .panel-heading, .task-card, .profile-bar { align-items: stretch; flex-direction: column; } .task-card label, .key-button, .task-card input, .task-card select { width: 100%; } .target-controls { max-width: none; } }

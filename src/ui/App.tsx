@@ -14,11 +14,12 @@ import {
   setTrayStatus
 } from '../platform/app-lifecycle';
 import { IntervalInput } from './IntervalInput';
+import { captureForegroundTarget } from '../platform/target-window';
 
 const noTasks: ScheduledTask[] = [];
 
 function newTask(name: string, enabled = true): ScheduledTask {
-  return { id: crypto.randomUUID(), name, shortcut: { key: 'A', modifiers: [] }, intervalMs: 1_000, enabled };
+  return { id: crypto.randomUUID(), name, shortcut: { key: 'A', modifiers: [] }, intervalMs: 1_000, enabled, target: { mode: 'focused' } };
 }
 
 function defaultProfiles(): Profile[] {
@@ -52,6 +53,7 @@ export default function App() {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<Profile | null>(null);
   const [accessibilityGranted, setAccessibilityGranted] = useState<boolean | null>(null);
+  const [capturingTargetId, setCapturingTargetId] = useState<string | null>(null);
   const [message, setMessage] = useState('尚未執行。F12 可隨時啟動或停止。');
   const activeProfile = profiles.find((profile) => profile.id === activeProfileId) ?? profiles[0];
   const tasks = activeProfile?.tasks ?? noTasks;
@@ -92,8 +94,8 @@ export default function App() {
       scheduler.current.start(tasks);
       setRunning(true);
       void setTrayStatus(true);
-      setMessage('正在對目前取得焦點的視窗送出按鍵。快速連按兩次 Esc 可緊急停止。');
-      void notify('KeyPulse 執行中', '正在將按鍵送到目前取得焦點的視窗。');
+      setMessage('連點任務正在執行。快速連按兩次 Esc 可緊急停止。');
+      void notify('KeyPulse 執行中', '連點任務正在執行。');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '設定無法啟動。');
     }
@@ -142,6 +144,29 @@ export default function App() {
 
   function updateTask(id: string, update: Partial<ScheduledTask>) {
     setTasks((current) => current.map((task) => (task.id === id ? { ...task, ...update } : task)));
+  }
+
+  function captureTarget(id: string) {
+    setCapturingTargetId(id);
+    setMessage('請在 3 秒內切換到要連點的目標視窗。');
+    window.setTimeout(() => {
+      void captureForegroundTarget().then((target) => {
+        updateTask(id, { target });
+        setMessage(`已指定目標：「${target.title}」。`);
+      }).catch(() => {
+        setMessage('無法取得目標視窗。請確認 KeyPulse 已開啟並再試一次。');
+      }).finally(() => setCapturingTargetId(null));
+    }, 3_000);
+  }
+
+  async function testTarget(task: ScheduledTask) {
+    try {
+      await new DesktopKeySender().send(task);
+      const targetName = task.target?.mode === 'window' ? task.target.title : '目前焦點';
+      setMessage(`已送出測試按鍵到「${targetName}」。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '目標視窗未接受測試按鍵。');
+    }
   }
 
   function captureShortcut(event: React.KeyboardEvent<HTMLButtonElement>, id: string) {
@@ -270,6 +295,19 @@ export default function App() {
               <small>點選後直接按鍵盤按鍵；這不是錄影。</small>
             </label>
             <label>間隔（秒）<IntervalInput intervalMs={task.intervalMs} onChange={(intervalMs) => updateTask(task.id, { intervalMs })} /></label>
+            <label>送鍵目標
+              <select value={task.target?.mode ?? 'focused'} onChange={(event) => event.target.value === 'window' ? captureTarget(task.id) : updateTask(task.id, { target: { mode: 'focused' } })}>
+                <option value="focused">目前焦點視窗</option>
+                <option value="window">指定應用程式／視窗</option>
+              </select>
+              {task.target?.mode === 'window' && <div className="target-controls">
+                <span title={task.target.title}>已選：{task.target.title}</span>
+                <button className="secondary-button" onClick={() => captureTarget(task.id)} type="button">{capturingTargetId === task.id ? '請切換視窗…' : '重新選取'}</button>
+                <button className="secondary-button" onClick={() => void testTarget(task)} type="button">測試送鍵</button>
+              </div>}
+              {task.target?.mode !== 'window' && <button className="secondary-button" onClick={() => captureTarget(task.id)} type="button">選取指定視窗</button>}
+              <small>選取後有 3 秒可切到目標；Windows 會指定視窗，Mac 會指定應用程式。</small>
+            </label>
             <label className="toggle-label"><input checked={task.enabled} type="checkbox" onChange={(event) => updateTask(task.id, { enabled: event.target.checked })} />啟用</label>
             <button className="remove-button" aria-label={`刪除 ${task.name}`} onClick={() => setTasks((current) => current.filter((item) => item.id !== task.id))}>刪除</button>
           </article>)}
@@ -277,7 +315,7 @@ export default function App() {
       </section>
 
       <aside className="help-card"><h2>使用提醒</h2><ul>
-        <li>按鍵會送到目前取得焦點的視窗；請在開始前確認焦點位置。</li>
+        <li>預設送到目前焦點；選取指定視窗後，可在其他螢幕工作。部分程式可能拒絕背景按鍵。</li>
         <li>按 <kbd>F12</kbd> 啟動或停止；0.5 秒內連按兩次 <kbd>Esc</kbd> 可緊急停止。</li>
         <li>Mac 若 F12 是媒體鍵，請使用 <kbd>Fn</kbd> + <kbd>F12</kbd>。</li>
         <li>首次於 Mac 使用時，請依系統提示授予「輔助使用」權限。</li>

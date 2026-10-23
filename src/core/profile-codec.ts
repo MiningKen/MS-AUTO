@@ -1,5 +1,5 @@
 import { ProfileService, type Profile } from './profile-service';
-import type { KeyShortcut, ScheduledTask } from './task-scheduler';
+import type { InputTarget, KeyShortcut, ScheduledTask } from './task-scheduler';
 
 export function parseProfiles(value: string): Profile[] {
   const parsed: unknown = JSON.parse(value);
@@ -40,7 +40,29 @@ function parseTask(value: unknown): ScheduledTask {
     name: nonEmptyString(record.name, '任務名稱'),
     intervalMs,
     enabled: record.enabled,
-    shortcut: parseShortcut(record.shortcut)
+    shortcut: parseShortcut(record.shortcut),
+    target: parseTarget(record.target)
+  };
+}
+
+function parseTarget(value: unknown): InputTarget | undefined {
+  if (value === undefined) return undefined;
+  const record = objectRecord(value, '目標視窗');
+  if (record.mode === 'focused') return { mode: 'focused' };
+  if (record.mode !== 'window') throw new Error('目標視窗模式無效');
+  const processId = record.processId;
+  if (typeof processId !== 'number' || !Number.isInteger(processId) || processId <= 0) {
+    throw new Error('目標視窗程序無效');
+  }
+  if (record.platform !== 'windows' && record.platform !== 'macos') {
+    throw new Error('目標視窗平台無效');
+  }
+  return {
+    mode: 'window',
+    id: nonEmptyString(record.id, '目標視窗 id'),
+    title: nonEmptyString(record.title, '目標視窗名稱'),
+    processId,
+    platform: record.platform
   };
 }
 

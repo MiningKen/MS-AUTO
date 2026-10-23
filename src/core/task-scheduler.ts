@@ -3,16 +3,27 @@ export type KeyShortcut = {
   modifiers: string[];
 };
 
+export type InputTarget =
+  | { mode: 'focused' }
+  | {
+    mode: 'window';
+    id: string;
+    title: string;
+    processId: number;
+    platform: 'windows' | 'macos';
+  };
+
 export type ScheduledTask = {
   id: string;
   name: string;
   shortcut: KeyShortcut;
   intervalMs: number;
   enabled: boolean;
+  target?: InputTarget;
 };
 
 export interface KeySender {
-  send(shortcut: KeyShortcut): void | Promise<void>;
+  send(task: ScheduledTask): void | Promise<void>;
 }
 
 export class TaskScheduler {
@@ -36,7 +47,7 @@ export class TaskScheduler {
 
       this.timers.push(
         setInterval(() => {
-          this.send(task.shortcut);
+          this.send(task);
         }, task.intervalMs)
       );
     }
@@ -54,9 +65,9 @@ export class TaskScheduler {
     return this.running;
   }
 
-  private send(shortcut: KeyShortcut): void {
+  private send(task: ScheduledTask): void {
     try {
-      void Promise.resolve(this.sender.send(shortcut)).catch((error: unknown) => {
+      void Promise.resolve(this.sender.send(task)).catch((error: unknown) => {
         this.stop();
         this.onSendError(error);
       });

@@ -17,6 +17,8 @@ describe('ProfileService', () => {
     expect(() => parseProfile({ id: 'work', name: 'Office work', tasks: [{ id: 'copy' }] }))
       .toThrow('任務間隔必須是有效數字');
     expect(() => parseProfiles('{"id":"work"}')).toThrow('設定資料必須是設定檔陣列');
+    expect(() => parseProfile({ ...profile, tasks: [{ ...task, target: { mode: 'window' } }] }))
+      .toThrow('目標視窗程序無效');
   });
 
   it('rejects intervals below 0.1 seconds and duplicate enabled shortcuts', () => {
