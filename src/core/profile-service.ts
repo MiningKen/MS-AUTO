@@ -1,10 +1,9 @@
-import type { InputTarget, ScheduledTask } from './task-scheduler';
+import type { ScheduledTask } from './task-scheduler';
 
 export type Profile = {
   id: string;
   name: string;
   tasks: ScheduledTask[];
-  target?: InputTarget;
 };
 
 export type ImportResolution = 'skip' | 'copy' | 'replace';
@@ -43,6 +42,12 @@ export class ProfileService {
     for (const task of profile.tasks) {
       if (task.intervalMs < 100) {
         throw new Error('間隔至少必須是 0.1 秒');
+      }
+      if (task.randomIntervalMs) {
+        const { min, max } = task.randomIntervalMs;
+        if (min < 100 || max < min) {
+          throw new Error('隨機間隔的最小值至少為 0.1 秒，且不可大於最大值');
+        }
       }
     }
   }

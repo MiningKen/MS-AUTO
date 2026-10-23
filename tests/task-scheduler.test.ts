@@ -37,6 +37,23 @@ describe('TaskScheduler', () => {
     expect(sender.send).toHaveBeenCalledTimes(1);
   });
 
+  it('uses a new random delay within the configured range for every send', () => {
+    vi.useFakeTimers();
+    const sender: KeySender = { send: vi.fn() };
+    const scheduler = new TaskScheduler(sender, console.error, () => 0.5);
+    const randomTask = { ...task, randomIntervalMs: { min: 500, max: 1_000 } };
+
+    scheduler.start([randomTask]);
+    vi.advanceTimersByTime(749);
+    expect(sender.send).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(sender.send).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(750);
+    expect(sender.send).toHaveBeenCalledTimes(2);
+  });
+
   it('stops every task if the platform cannot send a key', async () => {
     vi.useFakeTimers();
     const sender: KeySender = { send: vi.fn(() => { throw new Error('permission denied'); }) };

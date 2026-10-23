@@ -1,5 +1,5 @@
 import { ProfileService, type Profile } from './profile-service';
-import type { InputTarget, KeyShortcut, ScheduledTask } from './task-scheduler';
+import type { KeyShortcut, ScheduledTask } from './task-scheduler';
 
 export function parseProfiles(value: string): Profile[] {
   const parsed: unknown = JSON.parse(value);
@@ -17,16 +17,10 @@ export function parseProfile(value: unknown): Profile {
   }
 
   const parsedTasks = tasks.map(parseTask);
-  const legacyTarget = parsedTasks.find((task) => task.target?.mode === 'window')?.target;
   const profile = {
     id: nonEmptyString(record.id, '設定檔 id'),
     name: nonEmptyString(record.name, '設定檔名稱'),
-    tasks: parsedTasks.map((task) => {
-      const migratedTask = { ...task };
-      delete migratedTask.target;
-      return migratedTask;
-    }),
-    target: parseTarget(record.target) ?? legacyTarget ?? { mode: 'focused' as const }
+    tasks: parsedTasks
   };
   new ProfileService().validate(profile);
   return profile;
@@ -46,31 +40,21 @@ function parseTask(value: unknown): ScheduledTask {
     id: nonEmptyString(record.id, '任務 id'),
     name: nonEmptyString(record.name, '任務名稱'),
     intervalMs,
+    randomIntervalMs: parseRandomInterval(record.randomIntervalMs),
     enabled: record.enabled,
-    shortcut: parseShortcut(record.shortcut),
-    target: parseTarget(record.target)
+    shortcut: parseShortcut(record.shortcut)
   };
 }
 
-function parseTarget(value: unknown): InputTarget | undefined {
+function parseRandomInterval(value: unknown): ScheduledTask['randomIntervalMs'] {
   if (value === undefined) return undefined;
-  const record = objectRecord(value, '目標視窗');
-  if (record.mode === 'focused') return { mode: 'focused' };
-  if (record.mode !== 'window') throw new Error('目標視窗模式無效');
-  const processId = record.processId;
-  if (typeof processId !== 'number' || !Number.isInteger(processId) || processId <= 0) {
-    throw new Error('目標視窗程序無效');
+  const record = objectRecord(value, '隨機間隔');
+  const min = record.min;
+  const max = record.max;
+  if (typeof min !== 'number' || !Number.isFinite(min) || typeof max !== 'number' || !Number.isFinite(max)) {
+    throw new Error('隨機間隔必須是有效數字');
   }
-  if (record.platform !== 'windows' && record.platform !== 'macos') {
-    throw new Error('目標視窗平台無效');
-  }
-  return {
-    mode: 'window',
-    id: nonEmptyString(record.id, '目標視窗 id'),
-    title: nonEmptyString(record.title, '目標視窗名稱'),
-    processId,
-    platform: record.platform
-  };
+  return { min, max };
 }
 
 function parseShortcut(value: unknown): KeyShortcut {

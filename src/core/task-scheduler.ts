@@ -3,23 +3,13 @@ export type KeyShortcut = {
   modifiers: string[];
 };
 
-export type InputTarget =
-  | { mode: 'focused' }
-  | {
-    mode: 'window';
-    id: string;
-    title: string;
-    processId: number;
-    platform: 'windows' | 'macos';
-  };
-
 export type ScheduledTask = {
   id: string;
   name: string;
   shortcut: KeyShortcut;
   intervalMs: number;
+  randomIntervalMs?: { min: number; max: number };
   enabled: boolean;
-  target?: InputTarget;
 };
 
 export interface KeySender {
@@ -27,13 +17,14 @@ export interface KeySender {
 }
 
 export class TaskScheduler {
-  private timers: ReturnType<typeof setInterval>[] = [];
+  private timers = new Set<ReturnType<typeof setTimeout>>();
 
   private running = false;
 
   constructor(
     private readonly sender: KeySender,
-    private readonly onSendError: (error: unknown, task: ScheduledTask) => void = console.error
+    private readonly onSendError: (error: unknown, task: ScheduledTask) => void = console.error,
+    private readonly random: () => number = Math.random
   ) {}
 
   start(tasks: ScheduledTask[]): void {
@@ -45,19 +36,15 @@ export class TaskScheduler {
         continue;
       }
 
-      this.timers.push(
-        setInterval(() => {
-          this.send(task);
-        }, task.intervalMs)
-      );
+      this.schedule(task);
     }
   }
 
   stop(): void {
     for (const timer of this.timers) {
-      clearInterval(timer);
+      clearTimeout(timer);
     }
-    this.timers = [];
+    this.timers.clear();
     this.running = false;
   }
 
@@ -75,5 +62,21 @@ export class TaskScheduler {
       this.stop();
       this.onSendError(error, task);
     }
+  }
+
+  private schedule(task: ScheduledTask): void {
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      if (!this.running) return;
+      this.send(task);
+      if (this.running) this.schedule(task);
+    }, this.nextDelay(task));
+    this.timers.add(timer);
+  }
+
+  private nextDelay(task: ScheduledTask): number {
+    if (!task.randomIntervalMs) return task.intervalMs;
+    const { min, max } = task.randomIntervalMs;
+    return Math.round(min + (max - min) * this.random());
   }
 }

@@ -32,7 +32,7 @@ h2 { font-size: 1.1rem; }
 .import-conflict div { display: flex; gap: 8px; }
 .task-panel, .help-card { border: 1px solid #334155; background: #172033; border-radius: 16px; padding: 22px; }
 .task-list { display: grid; gap: 12px; margin-top: 20px; }
-.task-card { align-items: end; padding: 18px; background: #0f172a; border-radius: 12px; }
+.task-card { align-items: end; flex-wrap: wrap; padding: 18px; background: #0f172a; border-radius: 12px; }
 .drag-handle { align-self: center; color: #94a3b8; cursor: grab; font-size: 1.4rem; }
 label { display: grid; gap: 7px; color: #cbd5e1; font-size: .85rem; font-weight: 700; }
 label:first-child { flex: 1 1 200px; }

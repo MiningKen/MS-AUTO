@@ -17,8 +17,8 @@ describe('ProfileService', () => {
     expect(() => parseProfile({ id: 'work', name: 'Office work', tasks: [{ id: 'copy' }] }))
       .toThrow('任務間隔必須是有效數字');
     expect(() => parseProfiles('{"id":"work"}')).toThrow('設定資料必須是設定檔陣列');
-    expect(() => parseProfile({ ...profile, target: { mode: 'window' } }))
-      .toThrow('目標視窗程序無效');
+    expect(() => parseProfile({ ...profile, tasks: [{ ...task, randomIntervalMs: { min: 'fast', max: 500 } }] }))
+      .toThrow('隨機間隔必須是有效數字');
   });
 
   it('rejects intervals below 0.1 seconds and duplicate enabled shortcuts', () => {
@@ -37,6 +37,10 @@ describe('ProfileService', () => {
     expect(() =>
       service.validate({ ...profile, tasks: [{ ...task, intervalMs: 99 }] })
     ).toThrow('間隔至少必須是 0.1 秒');
+
+    expect(() =>
+      service.validate({ ...profile, tasks: [{ ...task, randomIntervalMs: { min: 1_000, max: 500 } }] })
+    ).toThrow('隨機間隔的最小值至少為 0.1 秒，且不可大於最大值');
   });
 
   it('rejects enabled tasks that conflict with the F12 or Esc control keys', () => {
