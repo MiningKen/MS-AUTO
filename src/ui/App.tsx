@@ -3,7 +3,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { createDoublePressHandler } from '../core/double-press';
 import { ProfileService, type ImportResolution, type Profile } from '../core/profile-service';
 import { parseProfile, parseProfiles } from '../core/profile-codec';
-import { TaskScheduler, type KeyShortcut, type ScheduledTask } from '../core/task-scheduler';
+import { TaskScheduler, type InputTarget, type KeyShortcut, type ScheduledTask } from '../core/task-scheduler';
 import { registerControlShortcuts } from '../platform/global-shortcuts';
 import { DesktopKeySender } from '../platform/key-sender';
 import { notify } from '../platform/notifications';
@@ -58,6 +58,11 @@ export default function App() {
   const [capturingTargetId, setCapturingTargetId] = useState<string | null>(null);
   const [message, setMessage] = useState('尚未執行。F12 可隨時啟動或停止。');
   const activeProfile = profiles.find((profile) => profile.id === activeProfileId) ?? profiles[0];
+  const targetByProfileId = useRef(new Map<string, InputTarget>(profiles.map((profile) => [profile.id, profile.target ?? { mode: 'focused' }])));
+  const activeTarget = useMemo(
+    () => targetByProfileId.current.get(activeProfile?.id ?? '') ?? activeProfile?.target ?? { mode: 'focused' as const },
+    [activeProfile]
+  );
   const tasks = activeProfile?.tasks ?? noTasks;
   const scheduler = useRef(new TaskScheduler(new DesktopKeySender(), (error, task) => {
     setRunning(false);
@@ -70,6 +75,10 @@ export default function App() {
   const localEscapeStop = useRef(createDoublePressHandler(() => actions.current.stop()));
 
   useEffect(() => { localStorage.setItem('key-pulse.profiles', JSON.stringify(profiles)); }, [profiles]);
+
+  useEffect(() => {
+    targetByProfileId.current = new Map(profiles.map((profile) => [profile.id, profile.target ?? { mode: 'focused' }]));
+  }, [profiles]);
 
   useEffect(() => {
     const refreshPermission = () => void accessibilityPermissionGranted().then(setAccessibilityGranted);
@@ -88,14 +97,17 @@ export default function App() {
 
   const start = useCallback(() => {
     try {
+      if (capturingTargetId === activeProfile?.id) {
+        setMessage('正在鎖定指定視窗，請完成後再啟動。');
+        return;
+      }
       if (accessibilityGranted === false) {
         setMessage('尚未取得 macOS「輔助使用」權限，請先開啟系統設定。');
         void notify('KeyPulse 需要輔助使用權限', '請在系統設定授予 KeyPulse 權限後再啟動。');
         return;
       }
       new ProfileService().validate({ id: 'current', name: '目前設定', tasks });
-      const target = activeProfile?.target ?? { mode: 'focused' as const };
-      scheduler.current.start(tasks.map((task) => ({ ...task, target })));
+      scheduler.current.start(tasks.map((task) => ({ ...task, target: activeTarget })));
       setRunning(true);
       void setTrayStatus(true);
       setMessage('連點任務正在執行。快速連按兩次 Esc 可緊急停止。');
@@ -103,7 +115,7 @@ export default function App() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '設定無法啟動。');
     }
-  }, [accessibilityGranted, activeProfile?.target, tasks]);
+  }, [accessibilityGranted, activeProfile?.id, activeTarget, capturingTargetId, tasks]);
 
   const toggle = useCallback(() => (running ? stop() : start()), [running, start, stop]);
   actions.current = { toggle, stop };
@@ -136,7 +148,7 @@ export default function App() {
     if (isTauri()) return;
     const listener = (event: KeyboardEvent) => {
       if (event.key === 'F12') { event.preventDefault(); actions.current.toggle(); }
-      if (event.key === 'Escape') localEscapeStop.current();
+      if (event.key === 'F1') localEscapeStop.current();
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
@@ -155,16 +167,18 @@ export default function App() {
     setTasks((current) => current.map((task) => (task.id === id ? { ...task, ...update } : task)));
   }
 
-  function updateProfileTarget(target: NonNullable<Profile['target']>) {
-    setProfiles((current) => current.map((profile) => profile.id === activeProfileId ? { ...profile, target } : profile));
+  function updateProfileTarget(profileId: string, target: NonNullable<Profile['target']>) {
+    targetByProfileId.current.set(profileId, target);
+    setProfiles((current) => current.map((profile) => profile.id === profileId ? { ...profile, target } : profile));
   }
 
   function captureTarget() {
-    setCapturingTargetId(activeProfileId);
+    const profileId = activeProfileId;
+    setCapturingTargetId(profileId);
     setMessage('請在 3 秒內切換到要連點的目標視窗。');
     window.setTimeout(() => {
       void captureForegroundTarget().then((target) => {
-        updateProfileTarget(target);
+        updateProfileTarget(profileId, target);
         setMessage(`已指定目標：「${target.title}」。`);
       }).catch(() => {
         setMessage('無法取得目標視窗。請確認 KeyPulse 已開啟並再試一次。');
@@ -174,9 +188,8 @@ export default function App() {
 
   async function testTarget(task: ScheduledTask) {
     try {
-      const target = activeProfile?.target ?? { mode: 'focused' as const };
-      await new DesktopKeySender().send({ ...task, target });
-      const targetName = target.mode === 'window' ? target.title : '目前焦點';
+      await new DesktopKeySender().send({ ...task, target: activeTarget });
+      const targetName = activeTarget.mode === 'window' ? activeTarget.title : '目前焦點';
       setMessage(`已送出測試按鍵到「${targetName}」。`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '目標視窗未接受測試按鍵。');
@@ -294,17 +307,17 @@ export default function App() {
       <section className="target-panel" aria-label="所有任務的送鍵目標">
         <div><h2>所有任務的送鍵目標</h2><p>此設定檔中的全部任務都使用同一個目標。</p></div>
         <label>送鍵目標
-          <select value={activeProfile?.target?.mode ?? 'focused'} onChange={(event) => event.target.value === 'window' ? captureTarget() : updateProfileTarget({ mode: 'focused' })}>
+          <select value={activeTarget.mode} onChange={(event) => event.target.value === 'window' ? captureTarget() : updateProfileTarget(activeProfileId, { mode: 'focused' })}>
             <option value="focused">目前焦點視窗</option>
             <option value="window">指定應用程式／視窗</option>
           </select>
         </label>
-        {activeProfile?.target?.mode === 'window' && <div className="target-controls">
-          <span title={activeProfile.target.title}>已選：{activeProfile.target.title}</span>
+        {activeTarget.mode === 'window' && <div className="target-controls">
+          <span title={activeTarget.title}>已鎖定：{activeTarget.title}</span>
           <button className="secondary-button" onClick={captureTarget} type="button">{capturingTargetId === activeProfileId ? '請切換視窗…' : '重新選取'}</button>
           <button className="secondary-button" onClick={() => void testTarget(tasks[0] ?? newTask('測試任務', false))} type="button">測試送鍵</button>
         </div>}
-        {activeProfile?.target?.mode !== 'window' && <div className="target-controls">
+        {activeTarget.mode !== 'window' && <div className="target-controls">
           <button className="secondary-button" onClick={captureTarget} type="button">選取指定視窗</button>
           <button className="secondary-button" onClick={() => void testTarget(tasks[0] ?? newTask('測試任務', false))} type="button">測試目前焦點</button>
         </div>}
@@ -337,7 +350,7 @@ export default function App() {
 
       <aside className="help-card"><h2>使用提醒</h2><ul>
         <li>此設定檔的所有任務共用一個送鍵目標；選取指定視窗後，可在其他螢幕工作。部分程式可能拒絕背景按鍵。</li>
-        <li>按 <kbd>{toggleShortcut}</kbd> 啟動或停止；0.5 秒內連按兩次 <kbd>Esc</kbd> 可緊急停止。</li>
+        <li>按 <kbd>{toggleShortcut}</kbd> 啟動或停止；0.5 秒內連按兩次 <kbd>F1</kbd> 可緊急停止。</li>
         <li>Mac 若 F12 是媒體鍵，請使用 <kbd>Fn</kbd> + <kbd>F12</kbd>。</li>
         <li>首次於 Mac 使用時，請依系統提示授予「輔助使用」權限。</li>
       </ul></aside>

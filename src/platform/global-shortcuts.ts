@@ -33,7 +33,7 @@ export async function registerControlShortcuts(
     : await tryRegister('Control+Shift+F12', onToggle)
       ? 'Ctrl + Shift + F12'
       : null;
-  const stopAvailable = await tryRegister('Escape', stopOnDoubleEscape);
+  const stopAvailable = await tryRegister('F1', stopOnDoubleEscape);
   const registration = {
     toggleShortcut,
     stopAvailable,

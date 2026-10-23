@@ -29,7 +29,7 @@ export class ProfileService {
         continue;
       }
 
-      if (task.shortcut.modifiers.length === 0 && ['F12', 'Escape', 'Esc'].includes(task.shortcut.key)) {
+      if (task.shortcut.modifiers.length === 0 && ['F1', 'F12'].includes(task.shortcut.key)) {
         throw new Error('不能使用 F12 或 Esc 作為連點按鍵');
       }
 
