@@ -7,23 +7,19 @@ export async function registerControlShortcuts(
   onUnavailable: () => void
 ) {
   const stopOnDoubleEscape = createDoublePressHandler(onStop);
-  let f12Registered = false;
   try {
-    await register('F12', (event) => {
-      if (event.state === 'Pressed') {
+    await register(['F12', 'Escape'], (event) => {
+      if (event.state !== 'Pressed') return;
+      if (event.shortcut.toLowerCase() === 'f12') {
         onToggle();
       }
-    });
-    f12Registered = true;
-    await register('Escape', (event) => {
-      if (event.state === 'Pressed') {
+      if (['escape', 'esc'].includes(event.shortcut.toLowerCase())) {
         stopOnDoubleEscape();
       }
     });
 
     return async () => unregister(['F12', 'Escape']);
   } catch (error) {
-    if (f12Registered) await unregister('F12');
     console.info('全域熱鍵無法註冊。', error);
     onUnavailable();
     return () => Promise.resolve();

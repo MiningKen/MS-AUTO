@@ -33,7 +33,7 @@ export class TaskScheduler {
 
   constructor(
     private readonly sender: KeySender,
-    private readonly onSendError: (error: unknown) => void = console.error
+    private readonly onSendError: (error: unknown, task: ScheduledTask) => void = console.error
   ) {}
 
   start(tasks: ScheduledTask[]): void {
@@ -69,11 +69,11 @@ export class TaskScheduler {
     try {
       void Promise.resolve(this.sender.send(task)).catch((error: unknown) => {
         this.stop();
-        this.onSendError(error);
+        this.onSendError(error, task);
       });
     } catch (error) {
       this.stop();
-      this.onSendError(error);
+      this.onSendError(error, task);
     }
   }
 }

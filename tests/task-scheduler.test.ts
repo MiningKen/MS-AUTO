@@ -47,6 +47,6 @@ describe('TaskScheduler', () => {
     await vi.advanceTimersByTimeAsync(500);
 
     expect(scheduler.isRunning()).toBe(false);
-    expect(onSendError).toHaveBeenCalledWith(expect.objectContaining({ message: 'permission denied' }));
+    expect(onSendError).toHaveBeenCalledWith(expect.objectContaining({ message: 'permission denied' }), task);
   });
 });

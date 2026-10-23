@@ -1,9 +1,10 @@
-import type { ScheduledTask } from './task-scheduler';
+import type { InputTarget, ScheduledTask } from './task-scheduler';
 
 export type Profile = {
   id: string;
   name: string;
   tasks: ScheduledTask[];
+  target?: InputTarget;
 };
 
 export type ImportResolution = 'skip' | 'copy' | 'replace';

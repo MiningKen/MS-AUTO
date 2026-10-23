@@ -16,10 +16,17 @@ export function parseProfile(value: unknown): Profile {
     throw new Error('設定檔的任務必須是陣列');
   }
 
+  const parsedTasks = tasks.map(parseTask);
+  const legacyTarget = parsedTasks.find((task) => task.target?.mode === 'window')?.target;
   const profile = {
     id: nonEmptyString(record.id, '設定檔 id'),
     name: nonEmptyString(record.name, '設定檔名稱'),
-    tasks: tasks.map(parseTask)
+    tasks: parsedTasks.map((task) => {
+      const migratedTask = { ...task };
+      delete migratedTask.target;
+      return migratedTask;
+    }),
+    target: parseTarget(record.target) ?? legacyTarget ?? { mode: 'focused' as const }
   };
   new ProfileService().validate(profile);
   return profile;

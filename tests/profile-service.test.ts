@@ -17,7 +17,7 @@ describe('ProfileService', () => {
     expect(() => parseProfile({ id: 'work', name: 'Office work', tasks: [{ id: 'copy' }] }))
       .toThrow('任務間隔必須是有效數字');
     expect(() => parseProfiles('{"id":"work"}')).toThrow('設定資料必須是設定檔陣列');
-    expect(() => parseProfile({ ...profile, tasks: [{ ...task, target: { mode: 'window' } }] }))
+    expect(() => parseProfile({ ...profile, target: { mode: 'window' } }))
       .toThrow('目標視窗程序無效');
   });
 
